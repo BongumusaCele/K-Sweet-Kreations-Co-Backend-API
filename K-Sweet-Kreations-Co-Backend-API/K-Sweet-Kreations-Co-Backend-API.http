@@ -1,0 +1,6 @@
+@K_Sweet_Kreations_Co_Backend_API_HostAddress = http://localhost:5088
+
+GET {{K_Sweet_Kreations_Co_Backend_API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
