@@ -17,7 +17,11 @@ namespace K_Sweet_Kreations_Co_Backend_API.Dtos
         [MaxLength(50)]
         public string Category { get; set; } = string.Empty;
 
-        [Range(typeof(decimal), "0.01", "99999999.99")]
+        [Range(
+    typeof(decimal),
+    "0.01",
+    "99999999.99",
+    ParseLimitsInInvariantCulture = true)]
         public decimal StartingPrice { get; set; }
 
         public bool Available { get; set; } = true;
