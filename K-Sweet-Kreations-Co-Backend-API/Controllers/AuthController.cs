@@ -2,6 +2,7 @@
 using K_Sweet_Kreations_Co_Backend_API.Data;
 using K_Sweet_Kreations_Co_Backend_API.Dtos;
 using K_Sweet_Kreations_Co_Backend_API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -196,6 +197,63 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 fullName = user.FullName,
                 email = user.Email,
                 role = user.Role
+            });
+        }
+
+        // POST: api/Auth/create-consultant
+        [HttpPost("create-consultant")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> CreateConsultant(
+            [FromBody] CreateConsultantDto dto)
+        {
+            var email = dto.Email.Trim().ToLowerInvariant();
+
+            var emailExists = await _context.UserAccounts
+                .AnyAsync(u => u.Email == email);
+
+            if (emailExists)
+            {
+                return Conflict(new
+                {
+                    message = "An account with this email already exists."
+                });
+            }
+
+            var consultant = new UserAccount
+            {
+                FullName = dto.FullName.Trim(),
+                Email = email,
+                PhoneNumber = dto.PhoneNumber.Trim(),
+                Role = "Consultant",
+                Active = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            consultant.PasswordHash =
+                _passwordHasher.HashPassword(
+                    consultant, dto.Password);
+
+            _context.UserAccounts.Add(consultant);
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                return Conflict(new
+                {
+                    message = "Unable to create consultant account."
+                });
+            }
+
+            return StatusCode(201, new
+            {
+                message = "Consultant account created successfully.",
+                userId = consultant.UserId,
+                fullName = consultant.FullName,
+                email = consultant.Email,
+                role = consultant.Role
             });
         }
 
