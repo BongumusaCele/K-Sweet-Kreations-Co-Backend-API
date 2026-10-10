@@ -23,26 +23,30 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
 
         // POST: api/Quotations
         [HttpPost]
-        [Authorize(Roles = "Consultant")]
+        [Authorize(Roles = "Admin,Consultant")]
         public async Task<IActionResult> CreateQuotation(
             [FromBody] CreateQuotationDto dto)
         {
             var userIdValue = User.FindFirstValue(
                 ClaimTypes.NameIdentifier);
 
-            if (!int.TryParse(userIdValue, out int consultantId))
+            if (!int.TryParse(userIdValue, out int staffId))
             {
                 return Unauthorized(new
                 {
-                    message = "Invalid consultant authentication."
+                    message = "Invalid staff authentication."
                 });
             }
 
-            var consultantExists = await _context.UserAccounts
-                .AnyAsync(u => u.UserId == consultantId
-                    && u.Active && u.Role == "Consultant");
+            var staff = await _context.UserAccounts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u =>
+                    u.UserId == staffId &&
+                    u.Active &&
+                    (u.Role == "Admin" ||
+                     u.Role == "Consultant"));
 
-            if (!consultantExists)
+            if (staff == null)
             {
                 return Forbid();
             }
@@ -60,30 +64,40 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 });
             }
 
-            if (request.ConsultantId != consultantId)
+            // Consultants may only quote requests assigned to them.
+            // Admins may quote any request under review.
+            if (staff.Role == "Consultant" &&
+                request.ConsultantId != staffId)
             {
-                return Forbid();
+                return StatusCode(403, new
+                {
+                    message =
+                        "This custom cake request is not assigned to you."
+                });
             }
 
             if (request.Status != "Under Review")
             {
                 return BadRequest(new
                 {
-                    message = "Only requests under review can receive quotations."
+                    message =
+                        "Only requests under review can receive quotations.",
+                    currentStatus = request.Status
                 });
             }
 
             var existingQuotation = await _context.Quotations
                 .AnyAsync(q =>
                     q.CustomCakeRequestId ==
-                    dto.CustomCakeRequestId &&
+                        dto.CustomCakeRequestId &&
                     q.Status == "Pending");
 
             if (existingQuotation)
             {
                 return Conflict(new
                 {
-                    message = "A pending quotation already exists for this request."
+                    message =
+                        "A pending quotation already exists for this request."
                 });
             }
 
@@ -91,7 +105,8 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             {
                 return BadRequest(new
                 {
-                    message = "Quoted amount must be greater than zero."
+                    message =
+                        "Quoted amount must be greater than zero."
                 });
             }
 
@@ -100,29 +115,45 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             {
                 return BadRequest(new
                 {
-                    message = "Quotation expiry must be in the future."
+                    message =
+                        "Quotation expiry must be in the future."
                 });
             }
 
+            // Keep the quotation associated with the
+            // assigned consultant where one exists.
+            // Otherwise, an Admin may act as the quoting staff member.
+            var quotationConsultantId =
+                request.ConsultantId ?? staffId;
+
             var quotation = new Quotation
             {
-                CustomCakeRequestId = dto.CustomCakeRequestId,
-                ConsultantId = consultantId,
+                CustomCakeRequestId =
+                    dto.CustomCakeRequestId,
+
+                ConsultantId = quotationConsultantId,
+
                 QuotedAmount = dto.QuotedAmount,
+
                 Notes = dto.Notes?.Trim(),
+
                 Status = "Pending",
+
                 CreatedAt = DateTime.UtcNow,
+
                 ExpiresAt = dto.ExpiresAt
             };
 
             _context.Quotations.Add(quotation);
+
             await _context.SaveChangesAsync();
 
             return StatusCode(201, new
             {
                 message = "Quotation created successfully.",
                 quotationId = quotation.QuotationId,
-                customCakeRequestId = quotation.CustomCakeRequestId,
+                customCakeRequestId =
+                    quotation.CustomCakeRequestId,
                 consultantId = quotation.ConsultantId,
                 quotedAmount = quotation.QuotedAmount,
                 notes = quotation.Notes,
@@ -131,7 +162,6 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 expiresAt = quotation.ExpiresAt
             });
         }
-
 
         // GET: api/Quotations/my-quotations
         [HttpGet("my-quotations")]
@@ -151,7 +181,8 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
 
             var quotations = await _context.Quotations
                 .AsNoTracking()
-                .Where(q => q.CustomCakeRequest.CustomerId == customerId)
+                .Where(q =>
+                    q.CustomCakeRequest.CustomerId == customerId)
                 .OrderByDescending(q => q.CreatedAt)
                 .Select(q => new
                 {
@@ -170,7 +201,6 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             return Ok(quotations);
         }
 
-
         // GET: api/Quotations/{id}
         [HttpGet("{id:int}")]
         [Authorize(Roles = "Customer,Admin,Consultant")]
@@ -187,13 +217,16 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 });
             }
 
-            var isStaff = User.IsInRole("Admin")
-                || User.IsInRole("Consultant");
+            var isAdmin = User.IsInRole("Admin");
+            var isConsultant = User.IsInRole("Consultant");
 
             var quotation = await _context.Quotations
                 .AsNoTracking()
                 .Where(q => q.QuotationId == id)
-                .Where(q => isStaff ||
+                .Where(q =>
+                    isAdmin ||
+                    (isConsultant &&
+                     q.ConsultantId == userId) ||
                     q.CustomCakeRequest.CustomerId == userId)
                 .Select(q => new
                 {
@@ -218,7 +251,6 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
 
             return Ok(quotation);
         }
-
 
         // PATCH: api/Quotations/{id}/respond
         [HttpPatch("{id:int}/respond")]
@@ -256,7 +288,8 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             {
                 return BadRequest(new
                 {
-                    message = "This quotation has already been responded to."
+                    message =
+                        "This quotation has already been responded to."
                 });
             }
 
@@ -269,10 +302,20 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 });
             }
 
+            if (dto.Status != "Accepted" &&
+                dto.Status != "Rejected")
+            {
+                return BadRequest(new
+                {
+                    message =
+                        "Quotation response must be Accepted or Rejected."
+                });
+            }
+
             if (dto.Status == "Accepted")
             {
-                var otherAcceptedQuotation = await _context.Quotations
-                    .AnyAsync(q =>
+                var otherAcceptedQuotation =
+                    await _context.Quotations.AnyAsync(q =>
                         q.CustomCakeRequestId ==
                             quotation.CustomCakeRequestId &&
                         q.QuotationId != quotation.QuotationId &&
@@ -282,7 +325,8 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 {
                     return Conflict(new
                     {
-                        message = "A quotation has already been accepted for this cake request."
+                        message =
+                            "A quotation has already been accepted for this cake request."
                     });
                 }
             }
@@ -304,14 +348,15 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
 
             return Ok(new
             {
-                message = "Quotation response saved successfully.",
+                message =
+                    "Quotation response saved successfully.",
                 quotationId = quotation.QuotationId,
                 status = quotation.Status,
-                customCakeRequestId = quotation.CustomCakeRequestId,
-                requestStatus = quotation.CustomCakeRequest.Status
+                customCakeRequestId =
+                    quotation.CustomCakeRequestId,
+                requestStatus =
+                    quotation.CustomCakeRequest.Status
             });
         }
-
-
     }
 }

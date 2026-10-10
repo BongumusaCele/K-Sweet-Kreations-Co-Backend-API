@@ -171,7 +171,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             return Ok(results);
         }
 
-        // GET: api/CustomerOrders/1
+        // GET: api/CustomerOrders/{id}
         [HttpGet("{id:int}")]
         [Authorize(Roles = "Customer,Admin")]
         public async Task<IActionResult> GetOrderById(int id)
@@ -284,7 +284,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             return Ok(results);
         }
 
-        // PATCH: api/CustomerOrders/1/status
+        // PATCH: api/CustomerOrders/{id}/status
         [HttpPatch("{id:int}/status")]
         [Authorize(Roles = "Admin,Consultant")]
         public async Task<IActionResult> UpdateOrderStatus(
@@ -312,13 +312,21 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 });
             }
 
+            // Valid order status transitions.
+            // Cancellation is allowed before preparation starts.
             var allowedTransitions =
                 new Dictionary<string, string[]>(
                     StringComparer.OrdinalIgnoreCase)
                 {
+                    ["Pending Deposit"] = new[]
+                    {
+                        "Cancelled"
+                    },
+
                     ["Deposit Paid"] = new[]
                     {
-                        "In Preparation"
+                        "In Preparation",
+                        "Cancelled"
                     },
 
                     ["Paid"] = new[]
@@ -412,7 +420,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             });
         }
 
-        // GET: api/CustomerOrders/1/history
+        // GET: api/CustomerOrders/{id}/history
         [HttpGet("{id:int}/history")]
         [Authorize(Roles = "Customer,Admin,Consultant")]
         public async Task<IActionResult> GetOrderHistory(int id)

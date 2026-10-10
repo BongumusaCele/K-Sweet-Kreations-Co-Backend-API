@@ -9,6 +9,7 @@ using Microsoft.OpenApi;
 using System.Text;
 using System.Text.Json.Serialization;
 using K_Sweet_Kreations_Co_Backend_API.Seeders;
+using K_Sweet_Kreations_Co_Backend_API.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -88,6 +89,8 @@ builder.Services.AddAuthorization();
 
 
 var app = builder.Build();
+
+app.UseMiddleware<GlobalExceptionMiddleware>();
 
 // Enable Swagger during development
 if (app.Environment.IsDevelopment())
