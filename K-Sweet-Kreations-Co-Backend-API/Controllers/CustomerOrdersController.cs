@@ -16,8 +16,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
     {
         private readonly ApplicationDbContext _context;
 
-        public CustomerOrdersController(
-            ApplicationDbContext context)
+        public CustomerOrdersController(ApplicationDbContext context)
         {
             _context = context;
         }
@@ -44,15 +43,8 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 .FirstOrDefaultAsync(q =>
                     q.QuotationId == dto.QuotationId);
 
-            if (quotation == null)
-            {
-                return NotFound(new
-                {
-                    message = "Quotation not found."
-                });
-            }
-
-            if (quotation.CustomCakeRequest.CustomerId != customerId)
+            if (quotation == null ||
+                quotation.CustomCakeRequest.CustomerId != customerId)
             {
                 return NotFound(new
                 {
@@ -126,6 +118,357 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 orderStatus = order.OrderStatus,
                 collectionDateTime = order.CollectionDateTime,
                 createdAt = order.CreatedAt
+            });
+        }
+
+        // GET: api/CustomerOrders/my-orders
+        [HttpGet("my-orders")]
+        [Authorize(Roles = "Customer")]
+        public async Task<IActionResult> GetMyOrders()
+        {
+            var userIdValue = User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
+
+            if (!int.TryParse(userIdValue, out int customerId))
+            {
+                return Unauthorized(new
+                {
+                    message = "Invalid customer authentication."
+                });
+            }
+
+            var orders = await _context.CustomerOrders
+                .AsNoTracking()
+                .Where(o => o.CustomerId == customerId)
+                .OrderByDescending(o => o.CreatedAt)
+                .Select(o => new
+                {
+                    o.OrderId,
+                    o.QuotationId,
+                    o.TotalAmount,
+                    o.OrderStatus,
+                    o.CollectionDateTime,
+                    o.CreatedAt,
+                    TotalPaid = o.Payments
+                        .Where(p => p.PaymentStatus == "Completed")
+                        .Sum(p => (decimal?)p.Amount) ?? 0m
+                })
+                .ToListAsync();
+
+            var results = orders.Select(o => new
+            {
+                o.OrderId,
+                o.QuotationId,
+                o.TotalAmount,
+                o.OrderStatus,
+                o.CollectionDateTime,
+                o.CreatedAt,
+                o.TotalPaid,
+                OutstandingBalance =
+                    Math.Max(0m, o.TotalAmount - o.TotalPaid)
+            });
+
+            return Ok(results);
+        }
+
+        // GET: api/CustomerOrders/1
+        [HttpGet("{id:int}")]
+        [Authorize(Roles = "Customer,Admin")]
+        public async Task<IActionResult> GetOrderById(int id)
+        {
+            var userIdValue = User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
+
+            if (!int.TryParse(userIdValue, out int userId))
+            {
+                return Unauthorized(new
+                {
+                    message = "Invalid user authentication."
+                });
+            }
+
+            var isAdmin = User.IsInRole("Admin");
+
+            var order = await _context.CustomerOrders
+                .AsNoTracking()
+                .Where(o => o.OrderId == id)
+                .Where(o => isAdmin || o.CustomerId == userId)
+                .Select(o => new
+                {
+                    o.OrderId,
+                    o.CustomerId,
+                    o.QuotationId,
+                    o.TotalAmount,
+                    o.OrderStatus,
+                    o.CollectionDateTime,
+                    o.CreatedAt,
+                    Payments = o.Payments.Select(p => new
+                    {
+                        p.PaymentId,
+                        p.Amount,
+                        p.PaymentMethod,
+                        p.PaymentStatus,
+                        p.PaymentReference,
+                        p.PaidAt,
+                        p.CreatedAt
+                    }).ToList(),
+                    TotalPaid = o.Payments
+                        .Where(p => p.PaymentStatus == "Completed")
+                        .Sum(p => (decimal?)p.Amount) ?? 0m
+                })
+                .FirstOrDefaultAsync();
+
+            if (order == null)
+            {
+                return NotFound(new
+                {
+                    message = "Order not found."
+                });
+            }
+
+            return Ok(new
+            {
+                order.OrderId,
+                order.CustomerId,
+                order.QuotationId,
+                order.TotalAmount,
+                order.OrderStatus,
+                order.CollectionDateTime,
+                order.CreatedAt,
+                order.Payments,
+                order.TotalPaid,
+                OutstandingBalance = Math.Max(
+                    0m, order.TotalAmount - order.TotalPaid)
+            });
+        }
+
+        // GET: api/CustomerOrders
+        [HttpGet]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetAllOrders()
+        {
+            var orders = await _context.CustomerOrders
+                .AsNoTracking()
+                .OrderByDescending(o => o.CreatedAt)
+                .Select(o => new
+                {
+                    o.OrderId,
+                    o.CustomerId,
+                    CustomerName = o.Customer.FullName,
+                    o.QuotationId,
+                    o.TotalAmount,
+                    o.OrderStatus,
+                    o.CollectionDateTime,
+                    o.CreatedAt,
+                    TotalPaid = o.Payments
+                        .Where(p => p.PaymentStatus == "Completed")
+                        .Sum(p => (decimal?)p.Amount) ?? 0m
+                })
+                .ToListAsync();
+
+            var results = orders.Select(o => new
+            {
+                o.OrderId,
+                o.CustomerId,
+                o.CustomerName,
+                o.QuotationId,
+                o.TotalAmount,
+                o.OrderStatus,
+                o.CollectionDateTime,
+                o.CreatedAt,
+                o.TotalPaid,
+                OutstandingBalance = Math.Max(
+                    0m, o.TotalAmount - o.TotalPaid)
+            });
+
+            return Ok(results);
+        }
+
+        // PATCH: api/CustomerOrders/1/status
+        [HttpPatch("{id:int}/status")]
+        [Authorize(Roles = "Admin,Consultant")]
+        public async Task<IActionResult> UpdateOrderStatus(
+            int id,
+            [FromBody] UpdateOrderStatusDto dto)
+        {
+            var order = await _context.CustomerOrders
+                .FirstOrDefaultAsync(o => o.OrderId == id);
+
+            if (order == null)
+            {
+                return NotFound(new
+                {
+                    message = "Order not found."
+                });
+            }
+
+            var newStatus = dto.Status?.Trim();
+
+            if (string.IsNullOrWhiteSpace(newStatus))
+            {
+                return BadRequest(new
+                {
+                    message = "Order status is required."
+                });
+            }
+
+            var allowedTransitions =
+                new Dictionary<string, string[]>(
+                    StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Deposit Paid"] = new[]
+                    {
+                        "In Preparation"
+                    },
+
+                    ["Paid"] = new[]
+                    {
+                        "In Preparation"
+                    },
+
+                    ["In Preparation"] = new[]
+                    {
+                        "Ready for Collection"
+                    },
+
+                    ["Ready for Collection"] = new[]
+                    {
+                        "Collected"
+                    }
+                };
+
+            var previousStatus = order.OrderStatus;
+
+            var normalTransition =
+                allowedTransitions.TryGetValue(
+                    previousStatus,
+                    out var nextStatuses) &&
+                nextStatuses!.Contains(
+                    newStatus,
+                    StringComparer.OrdinalIgnoreCase);
+
+            // Recovery for orders whose preparation status
+            // was incorrectly overwritten by payment verification.
+            bool isRecovery =
+                User.IsInRole("Admin") &&
+                string.Equals(
+                    previousStatus,
+                    "Paid",
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(
+                    newStatus,
+                    "Ready for Collection",
+                    StringComparison.OrdinalIgnoreCase) &&
+                await _context.OrderStatusHistories.AnyAsync(h =>
+                    h.OrderId == id &&
+                    h.Status == "Ready for Collection") &&
+                (await _context.Payments
+                    .Where(p =>
+                        p.OrderId == id &&
+                        p.PaymentStatus == "Completed")
+                    .SumAsync(p => (decimal?)p.Amount) ?? 0m)
+                    >= order.TotalAmount;
+
+            if (!normalTransition && !isRecovery)
+            {
+                return BadRequest(new
+                {
+                    message = "Invalid order status transition.",
+                    currentStatus = previousStatus,
+                    requestedStatus = newStatus
+                });
+            }
+
+            var canonicalStatus = isRecovery
+                ? "Ready for Collection"
+                : nextStatuses!.First(s =>
+                    string.Equals(
+                        s,
+                        newStatus,
+                        StringComparison.OrdinalIgnoreCase));
+
+            order.OrderStatus = canonicalStatus;
+
+            var history = new OrderStatusHistory
+            {
+                OrderId = order.OrderId,
+                Status = canonicalStatus,
+                Notes = dto.Notes?.Trim(),
+                ChangedAt = DateTime.UtcNow
+            };
+
+            _context.OrderStatusHistories.Add(history);
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Order status updated successfully.",
+                orderId = order.OrderId,
+                previousStatus,
+                orderStatus = order.OrderStatus,
+                historyId = history.OrderStatusHistoryId,
+                changedAt = history.ChangedAt
+            });
+        }
+
+        // GET: api/CustomerOrders/1/history
+        [HttpGet("{id:int}/history")]
+        [Authorize(Roles = "Customer,Admin,Consultant")]
+        public async Task<IActionResult> GetOrderHistory(int id)
+        {
+            var userIdValue = User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
+
+            if (!int.TryParse(userIdValue, out int userId))
+            {
+                return Unauthorized(new
+                {
+                    message = "Invalid user authentication."
+                });
+            }
+
+            var isStaff = User.IsInRole("Admin") ||
+                          User.IsInRole("Consultant");
+
+            var order = await _context.CustomerOrders
+                .AsNoTracking()
+                .Where(o => o.OrderId == id)
+                .Where(o => isStaff || o.CustomerId == userId)
+                .Select(o => new
+                {
+                    o.OrderId,
+                    o.OrderStatus
+                })
+                .FirstOrDefaultAsync();
+
+            if (order == null)
+            {
+                return NotFound(new
+                {
+                    message = "Order not found."
+                });
+            }
+
+            var history = await _context.OrderStatusHistories
+                .AsNoTracking()
+                .Where(h => h.OrderId == id)
+                .OrderBy(h => h.ChangedAt)
+                .ThenBy(h => h.OrderStatusHistoryId)
+                .Select(h => new
+                {
+                    h.OrderStatusHistoryId,
+                    h.Status,
+                    h.Notes,
+                    h.ChangedAt
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                order.OrderId,
+                currentStatus = order.OrderStatus,
+                statusHistory = history
             });
         }
     }

@@ -110,4 +110,6 @@ if (app.Environment.IsDevelopment())
     await AdminSeeder.SeedAdminAsync(app.Services);
 }
 
+
+
 app.Run();
