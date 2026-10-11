@@ -104,6 +104,47 @@ namespace K_Sweet_Kreations_Co_Backend_API.Migrations
                     b.ToTable("CustomCakeRequests");
                 });
 
+            modelBuilder.Entity("K_Sweet_Kreations_Co_Backend_API.Models.CustomerNotification", b =>
+                {
+                    b.Property<int>("NotificationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("NotificationId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRead")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("NotificationId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("CustomerNotifications", (string)null);
+                });
+
             modelBuilder.Entity("K_Sweet_Kreations_Co_Backend_API.Models.CustomerOrder", b =>
                 {
                     b.Property<int>("OrderId")
@@ -506,6 +547,25 @@ namespace K_Sweet_Kreations_Co_Backend_API.Migrations
                     b.Navigation("Customer");
                 });
 
+            modelBuilder.Entity("K_Sweet_Kreations_Co_Backend_API.Models.CustomerNotification", b =>
+                {
+                    b.HasOne("K_Sweet_Kreations_Co_Backend_API.Models.UserAccount", "Customer")
+                        .WithMany("CustomerNotifications")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("K_Sweet_Kreations_Co_Backend_API.Models.CustomerOrder", "CustomerOrder")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("CustomerOrder");
+                });
+
             modelBuilder.Entity("K_Sweet_Kreations_Co_Backend_API.Models.CustomerOrder", b =>
                 {
                     b.HasOne("K_Sweet_Kreations_Co_Backend_API.Models.UserAccount", "Customer")
@@ -644,6 +704,8 @@ namespace K_Sweet_Kreations_Co_Backend_API.Migrations
                     b.Navigation("ConsultantCakeRequests");
 
                     b.Navigation("CustomerCakeRequests");
+
+                    b.Navigation("CustomerNotifications");
 
                     b.Navigation("CustomerOrders");
 
