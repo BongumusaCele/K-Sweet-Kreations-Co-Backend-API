@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace K_Sweet_Kreations_Co_Backend_API.Models
@@ -14,6 +15,10 @@ namespace K_Sweet_Kreations_Co_Backend_API.Models
         [Required]
         [MaxLength(500)]
         public string ImageUrl { get; set; } = string.Empty;
+
+        // Actual filename stored in PrivateUploads/custom-cakes
+        [MaxLength(255)]
+        public string? StoredFileName { get; set; }
 
         public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 

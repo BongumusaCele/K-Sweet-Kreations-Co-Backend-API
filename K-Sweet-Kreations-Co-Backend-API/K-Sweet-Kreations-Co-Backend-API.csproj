@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="PrivateUploads\custom-cakes\6626995bdcd546d79a241e9169429f67.webp" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
@@ -23,6 +27,8 @@
   <ItemGroup>
     <Folder Include="Enums\" />
     <Folder Include="Repositories\" />
+    <Folder Include="wwwroot\uploads\custom-cakes\" />
+    <Folder Include="wwwroot\uploads\products\" />
   </ItemGroup>
 
 </Project>

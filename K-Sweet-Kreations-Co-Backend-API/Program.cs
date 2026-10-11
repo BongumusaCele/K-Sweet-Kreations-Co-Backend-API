@@ -102,6 +102,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Enable access to uploaded product images
+app.UseStaticFiles();
+
 app.UseAuthentication();
 
 app.UseAuthorization();

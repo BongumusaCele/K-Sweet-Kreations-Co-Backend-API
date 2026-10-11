@@ -38,6 +38,10 @@ namespace K_Sweet_Kreations_Co_Backend_API.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("StoredFileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("datetime2");
 
