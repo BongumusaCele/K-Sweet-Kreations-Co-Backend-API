@@ -2,6 +2,9 @@
 using K_Sweet_Kreations_Co_Backend_API.Data;
 using K_Sweet_Kreations_Co_Backend_API.Dtos;
 using K_Sweet_Kreations_Co_Backend_API.Models;
+using K_Sweet_Kreations_Co_Backend_API.Observers;
+using K_Sweet_Kreations_Co_Backend_API.Services;
+using K_Sweet_Kreations_Co_Backend_API.Factories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,10 +19,20 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
     public class CustomerOrdersController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly OrderSubject _orderSubject;
+        private readonly OrderService _orderService;
+        private readonly ICustomerOrderFactory _orderFactory;
 
-        public CustomerOrdersController(ApplicationDbContext context)
+        public CustomerOrdersController(
+            ApplicationDbContext context,
+            OrderSubject orderSubject,
+            OrderService orderService,
+            ICustomerOrderFactory orderFactory)
         {
             _context = context;
+            _orderSubject = orderSubject;
+            _orderService = orderService;
+            _orderFactory = orderFactory;
         }
 
         // POST: api/CustomerOrders/from-quotation
@@ -90,19 +103,20 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 });
             }
 
-            var order = new CustomerOrder
-            {
-                CustomerId = customerId,
-                QuotationId = quotation.QuotationId,
-                TotalAmount = quotation.QuotedAmount,
-                CollectionDateTime =
-                    quotation.CustomCakeRequest.CollectionDateTime,
-                OrderStatus = "Pending Deposit",
-                CreatedAt = DateTime.UtcNow
-            };
+            // Strategy Pattern:
+            // Calculate the order total using the pricing strategy.
+            var totalAmount = _orderService.CalculateOrderTotal(
+                quotation.QuotedAmount);
+
+            // Factory Pattern:
+            // Delegate CustomerOrder creation to the factory.
+            var order = _orderFactory.CreateFromQuotation(
+                customerId,
+                quotation.QuotationId,
+                totalAmount,
+                quotation.CustomCakeRequest.CollectionDateTime);
 
             _context.CustomerOrders.Add(order);
-
             await _context.SaveChangesAsync();
 
             return StatusCode(201, new
@@ -313,8 +327,6 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 });
             }
 
-            // Valid order status transitions.
-            // Cancellation is allowed before preparation starts.
             var allowedTransitions =
                 new Dictionary<string, string[]>(
                     StringComparer.OrdinalIgnoreCase)
@@ -356,8 +368,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                     newStatus,
                     StringComparer.OrdinalIgnoreCase);
 
-            // Recovery for orders whose preparation status
-            // was incorrectly overwritten by payment verification.
+            // Preserve the existing administrative recovery rule.
             bool isRecovery =
                 User.IsInRole("Admin") &&
                 string.Equals(
@@ -409,6 +420,18 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             _context.OrderStatusHistories.Add(history);
 
             await _context.SaveChangesAsync();
+
+            // Observer Pattern:
+            // Notify observers after the status update is saved.
+            var orderEvent = new OrderStatusChangedEvent(
+                order.OrderId,
+                order.CustomerId,
+                previousStatus,
+                canonicalStatus,
+                history.ChangedAt
+            );
+
+            await _orderSubject.NotifyObserversAsync(orderEvent);
 
             return Ok(new
             {

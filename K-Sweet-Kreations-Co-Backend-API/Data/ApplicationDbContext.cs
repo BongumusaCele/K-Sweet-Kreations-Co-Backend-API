@@ -22,6 +22,8 @@ namespace K_Sweet_Kreations_Co_Backend_API.Data
         public DbSet<Payment> Payments { get; set; }
         public DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
         public DbSet<Enquiry> Enquiries { get; set; }
+        public DbSet<CustomerNotification> CustomerNotifications { get; set; } = null!;
+
 
         public DbSet<BlockedCollectionDate> BlockedCollectionDates { get; set; }
         public DbSet<CustomerReview> CustomerReviews { get; set; }
@@ -130,6 +132,38 @@ namespace K_Sweet_Kreations_Co_Backend_API.Data
                 .WithMany(u => u.Enquiries)
                 .HasForeignKey(e => e.CustomerId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+
+            modelBuilder.Entity<CustomerNotification>(entity =>
+            {
+                entity.ToTable("CustomerNotifications");
+
+                entity.HasKey(n => n.NotificationId);
+
+                entity.Property(n => n.Title)
+                    .IsRequired()
+                    .HasMaxLength(200);
+
+                entity.Property(n => n.Message)
+                    .IsRequired()
+                    .HasMaxLength(1000);
+
+                entity.Property(n => n.IsRead)
+                    .HasDefaultValue(false);
+
+
+                entity.HasOne(n => n.Customer)
+                    .WithMany(u => u.CustomerNotifications)
+                    .HasForeignKey(n => n.CustomerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(n => n.CustomerOrder)
+                    .WithMany()
+                    .HasForeignKey(n => n.OrderId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+            });
+
         }
     }
 }

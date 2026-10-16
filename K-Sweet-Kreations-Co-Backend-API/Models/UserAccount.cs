@@ -51,5 +51,10 @@ namespace K_Sweet_Kreations_Co_Backend_API.Models
 
         public ICollection<Enquiry> Enquiries { get; set; }
             = new List<Enquiry>();
+
+
+        public ICollection<CustomerNotification> CustomerNotifications { get; set; }
+            = new List<CustomerNotification>();
+
     }
 }

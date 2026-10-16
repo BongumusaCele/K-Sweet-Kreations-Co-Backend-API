@@ -1,8 +1,17 @@
 
 using K_Sweet_Kreations_Co_Backend_API.Data;
+using K_Sweet_Kreations_Co_Backend_API.Middleware;
 using K_Sweet_Kreations_Co_Backend_API.Models;
+using K_Sweet_Kreations_Co_Backend_API.Observers;
+using K_Sweet_Kreations_Co_Backend_API.Repositories;
+using K_Sweet_Kreations_Co_Backend_API.Seeders;
+using K_Sweet_Kreations_Co_Backend_API.Services;
+using K_Sweet_Kreations_Co_Backend_API.Strategies;
+using K_Sweet_Kreations_Co_Backend_API.Factories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient.Extensions.Azure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -11,14 +20,13 @@ using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using System.Threading.RateLimiting;
 using K_Sweet_Kreations_Co_Backend_API.Controllers;
-using K_Sweet_Kreations_Co_Backend_API.Services;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Text.Json.Serialization;
-using K_Sweet_Kreations_Co_Backend_API.Seeders;
-using K_Sweet_Kreations_Co_Backend_API.Middleware;
 using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
+
+
 
 // Configure SQL Server database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -139,6 +147,26 @@ builder.Services.AddRateLimiter(options =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue("RateLimits:IdentityPerMinute", 15), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
+
+
+builder.Services.AddScoped<IOrderObserver, CustomerNotificationObserver>();
+
+builder.Services.AddScoped<OrderSubject>();
+
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+
+builder.Services.AddScoped<ProductService>();
+
+builder.Services.AddScoped<
+    IOrderPricingStrategy,
+    AcceptedQuotationPricingStrategy>();
+
+builder.Services.AddScoped<OrderService>();
+
+builder.Services.AddScoped<
+    ICustomerOrderFactory,
+    CustomerOrderFactory>();
+
 
 
 var app = builder.Build();

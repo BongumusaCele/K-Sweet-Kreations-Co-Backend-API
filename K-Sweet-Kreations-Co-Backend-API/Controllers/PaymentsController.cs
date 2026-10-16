@@ -2,6 +2,7 @@
 using K_Sweet_Kreations_Co_Backend_API.Data;
 using K_Sweet_Kreations_Co_Backend_API.Dtos;
 using K_Sweet_Kreations_Co_Backend_API.Models;
+using K_Sweet_Kreations_Co_Backend_API.Observers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,10 +17,14 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
     public class PaymentsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly OrderSubject _orderSubject;
 
-        public PaymentsController(ApplicationDbContext context)
+        public PaymentsController(
+            ApplicationDbContext context,
+            OrderSubject orderSubject)
         {
             _context = context;
+            _orderSubject = orderSubject;
         }
 
         // POST: api/Payments
@@ -149,7 +154,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             {
                 OrderId = order.OrderId,
                 Amount = dto.Amount,
-                PaymentMethod = paymentMethod,
+                PaymentMethod = paymentMethod!,
                 PaymentStatus = "Pending",
                 PaymentReference = paymentReference,
                 CreatedAt = DateTime.UtcNow
@@ -172,7 +177,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             });
         }
 
-        // PATCH: api/Payments/1/verify
+        // PATCH: api/Payments/{id}/verify
         [HttpPatch("{id:int}/verify")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> VerifyPayment(
@@ -215,6 +220,9 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             }
 
             var order = payment.CustomerOrder;
+
+            // Capture the original status before verification.
+            var previousOrderStatus = order.OrderStatus;
 
             if (order.OrderStatus == "Cancelled")
             {
@@ -279,9 +287,48 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 payment.PaidAt = null;
             }
 
+            // OBSERVER PATTERN:
+            // Create an event only if the order status changed.
+            OrderStatusChangedEvent? orderEvent = null;
+
+            if (!string.Equals(
+                previousOrderStatus,
+                order.OrderStatus,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                var changedAt = DateTime.UtcNow;
+
+                // Record the payment-driven status change.
+                var history = new OrderStatusHistory
+                {
+                    OrderId = order.OrderId,
+                    Status = order.OrderStatus,
+                    Notes = "Order status updated after payment verification.",
+                    ChangedAt = changedAt
+                };
+
+                _context.OrderStatusHistories.Add(history);
+
+                orderEvent = new OrderStatusChangedEvent(
+                    order.OrderId,
+                    order.CustomerId,
+                    previousOrderStatus,
+                    order.OrderStatus,
+                    changedAt
+                );
+            }
+
+            // Save payment and order history.
             await _context.SaveChangesAsync();
 
+            // Commit the payment transaction.
             await transaction.CommitAsync();
+
+            // Notify registered observers when status changes.
+            if (orderEvent != null)
+            {
+                await _orderSubject.NotifyObserversAsync(orderEvent);
+            }
 
             return Ok(new
             {

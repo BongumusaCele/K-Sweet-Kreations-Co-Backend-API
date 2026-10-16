@@ -3,6 +3,7 @@ using K_Sweet_Kreations_Co_Backend_API.Controllers;
 using K_Sweet_Kreations_Co_Backend_API.Data;
 using K_Sweet_Kreations_Co_Backend_API.Dtos;
 using K_Sweet_Kreations_Co_Backend_API.Models;
+using K_Sweet_Kreations_Co_Backend_API.Observers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
@@ -51,7 +52,16 @@ namespace K_Sweet_Kreations_Co_Tests
         private static PaymentsController CreateAdminController(
             ApplicationDbContext context)
         {
-            var controller = new PaymentsController(context);
+            var observers = new List<IOrderObserver>
+{
+    new CustomerNotificationObserver(context)
+};
+
+            var orderSubject = new OrderSubject(observers);
+
+            var controller = new PaymentsController(
+                context,
+                orderSubject);
 
             var claims = new[]
             {
