@@ -1,10 +1,18 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace K_Sweet_Kreations_Co_Backend_API.Models
 {
     public class CustomerOrder
     {
+        [MaxLength(100)] public string ContactName { get; set; } = "";
+        [MaxLength(20)] public string ContactPhone { get; set; } = "";
+        [MaxLength(1000)] public string Instructions { get; set; } = "";
+        public bool SlotApproved { get; set; }
+        public bool CancelRequested { get; set; }
+        public int? RequestId { get; set; }
+        [Timestamp] public byte[]? Version { get; set; }
+
         [Key]
         public int OrderId { get; set; }
 

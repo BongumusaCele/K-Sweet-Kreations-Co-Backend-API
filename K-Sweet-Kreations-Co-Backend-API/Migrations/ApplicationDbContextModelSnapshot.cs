@@ -22,6 +22,27 @@ namespace K_Sweet_Kreations_Co_Backend_API.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("K_Sweet_Kreations_Co_Backend_API.Models.BlockedCollectionDate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Date")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date")
+                        .IsUnique();
+
+                    b.ToTable("BlockedCollectionDates");
+                });
+
             modelBuilder.Entity("K_Sweet_Kreations_Co_Backend_API.Models.CustomCakeImage", b =>
                 {
                     b.Property<int>("CustomCakeImageId")
@@ -71,6 +92,16 @@ namespace K_Sweet_Kreations_Co_Backend_API.Migrations
                     b.Property<int?>("ConsultantId")
                         .HasColumnType("int");
 
+                    b.Property<string>("ContactName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ContactPhone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -112,14 +143,32 @@ namespace K_Sweet_Kreations_Co_Backend_API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("OrderId"));
 
+                    b.Property<bool>("CancelRequested")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime>("CollectionDateTime")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("ContactName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ContactPhone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Instructions")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("OrderStatus")
                         .IsRequired()
@@ -129,16 +178,70 @@ namespace K_Sweet_Kreations_Co_Backend_API.Migrations
                     b.Property<int?>("QuotationId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("RequestId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("SlotApproved")
+                        .HasColumnType("bit");
+
                     b.Property<decimal>("TotalAmount")
                         .HasColumnType("decimal(10,2)");
+
+                    b.Property<byte[]>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.HasKey("OrderId");
 
                     b.HasIndex("CustomerId");
 
-                    b.HasIndex("QuotationId");
+                    b.HasIndex("QuotationId")
+                        .IsUnique()
+                        .HasFilter("[QuotationId] IS NOT NULL");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique()
+                        .HasFilter("[RequestId] IS NOT NULL");
 
                     b.ToTable("CustomerOrders");
+                });
+
+            modelBuilder.Entity("K_Sweet_Kreations_Co_Backend_API.Models.CustomerReview", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CustomerReviews");
                 });
 
             modelBuilder.Entity("K_Sweet_Kreations_Co_Backend_API.Models.Enquiry", b =>
@@ -284,9 +387,17 @@ namespace K_Sweet_Kreations_Co_Backend_API.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("StoredProofName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.HasKey("PaymentId");
 
                     b.HasIndex("OrderId");
+
+                    b.HasIndex("PaymentReference")
+                        .IsUnique()
+                        .HasFilter("[PaymentReference] IS NOT NULL");
 
                     b.ToTable("Payments");
                 });
@@ -310,15 +421,33 @@ namespace K_Sweet_Kreations_Co_Backend_API.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<string>("Image")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("ProductName")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Servings")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Size")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<decimal>("StartingPrice")
                         .HasColumnType("decimal(10,2)");
@@ -475,6 +604,28 @@ namespace K_Sweet_Kreations_Co_Backend_API.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("UserSessions");
+                });
+
+            modelBuilder.Entity("K_Sweet_Kreations_Co_Backend_API.Models.WebsiteSubmission", b =>
+                {
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("CustomerId", "Kind", "Id");
+
+                    b.ToTable("WebsiteSubmissions");
                 });
 
             modelBuilder.Entity("K_Sweet_Kreations_Co_Backend_API.Models.CustomCakeImage", b =>
