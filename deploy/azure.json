@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "type": "string", "defaultValue": "southafricanorth" },
+    "appName": { "type": "string" },
+    "storageName": { "type": "string", "defaultValue": "ksweetmedia4d7f" },
+    "planName": { "type": "string", "defaultValue": "asp-ksweetkreations-basic" },
+    "sqlServerName": { "type": "string" },
+    "databaseName": { "type": "string", "defaultValue": "KSweetKreations" },
+    "sqlAdmin": { "type": "string", "defaultValue": "ksk_deployer" },
+    "sqlPassword": { "type": "securestring" }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts", "apiVersion": "2023-05-01",
+      "name": "[parameters('storageName')]", "location": "[parameters('location')]",
+      "kind": "StorageV2", "sku": { "name": "Standard_LRS" },
+      "properties": { "supportsHttpsTrafficOnly": true, "minimumTlsVersion": "TLS1_2", "allowBlobPublicAccess": false },
+      "tags": { "project": "K Sweet Kreations", "purpose": "product photos and private payment documents" }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms", "apiVersion": "2023-12-01",
+      "name": "[parameters('planName')]", "location": "[parameters('location')]",
+      "kind": "linux", "sku": { "name": "B1", "tier": "Basic", "capacity": 1 },
+      "properties": { "reserved": true },
+      "tags": { "project": "K Sweet Kreations", "purpose": "student" }
+    },
+    {
+      "type": "Microsoft.Web/sites", "apiVersion": "2023-12-01",
+      "name": "[parameters('appName')]", "location": "[parameters('location')]", "kind": "app,linux",
+      "dependsOn": [ "[resourceId('Microsoft.Web/serverfarms', parameters('planName'))]" ],
+      "tags": { "project": "K Sweet Kreations", "purpose": "student" },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('planName'))]",
+        "httpsOnly": true,
+        "siteConfig": {
+          "linuxFxVersion": "DOTNETCORE|10.0", "alwaysOn": true,
+          "minTlsVersion": "1.2", "scmMinTlsVersion": "1.2", "ftpsState": "Disabled",
+          "appCommandLine": "dotnet K-Sweet-Kreations-Co-Backend-API.dll"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers", "apiVersion": "2023-08-01",
+      "name": "[parameters('sqlServerName')]", "location": "[parameters('location')]",
+      "tags": { "project": "K Sweet Kreations", "purpose": "student" },
+      "properties": { "administratorLogin": "[parameters('sqlAdmin')]", "administratorLoginPassword": "[parameters('sqlPassword')]", "version": "12.0", "minimalTlsVersion": "1.2", "publicNetworkAccess": "Enabled" },
+      "resources": [
+        {
+          "type": "databases", "apiVersion": "2023-08-01", "name": "[parameters('databaseName')]", "location": "[parameters('location')]",
+          "dependsOn": [ "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]" ],
+          "sku": { "name": "Basic", "tier": "Basic", "capacity": 5 },
+          "properties": { "maxSizeBytes": 2147483648, "requestedBackupStorageRedundancy": "Local" }
+        }
+      ]
+    }
+  ],
+  "outputs": {
+    "websiteUrl": { "type": "string", "value": "[concat('https://', reference(resourceId('Microsoft.Web/sites', parameters('appName'))).defaultHostName)]" },
+    "sqlHost": { "type": "string", "value": "[reference(resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))).fullyQualifiedDomainName]" }
+  }
+}

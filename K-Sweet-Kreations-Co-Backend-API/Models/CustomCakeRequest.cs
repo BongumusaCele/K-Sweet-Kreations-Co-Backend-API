@@ -1,10 +1,13 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace K_Sweet_Kreations_Co_Backend_API.Models
 {
     public class CustomCakeRequest
     {
+        [MaxLength(100)] public string ContactName { get; set; } = "";
+        [MaxLength(20)] public string ContactPhone { get; set; } = "";
+
         [Key]
         public int CustomCakeRequestId { get; set; }
 

@@ -1,4 +1,4 @@
-﻿
+
 using System.ComponentModel.DataAnnotations;
 
 namespace K_Sweet_Kreations_Co_Backend_API.Dtos
@@ -6,7 +6,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Dtos
     public class RegisterDto
     {
         [Required]
-        [MaxLength(100)]
+        [StringLength(100, MinimumLength = 2)]
         public string FullName { get; set; } = string.Empty;
 
         [Required]
@@ -16,10 +16,12 @@ namespace K_Sweet_Kreations_Co_Backend_API.Dtos
 
         [Required]
         [MaxLength(20)]
+        [RegularExpression(@"\+?(?=(?:.*[0-9]){7})[0-9 ()-]{7,20}")]
         public string PhoneNumber { get; set; } = string.Empty;
 
         [Required]
         [MinLength(8)]
+        [MaxLength(128)]
         public string Password { get; set; } = string.Empty;
 
         [Required]

@@ -1,4 +1,4 @@
-﻿
+
 using K_Sweet_Kreations_Co_Backend_API.Data;
 using K_Sweet_Kreations_Co_Backend_API.Dtos;
 using K_Sweet_Kreations_Co_Backend_API.Models;
@@ -10,6 +10,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.RateLimiting;
 
 
 namespace K_Sweet_Kreations_Co_Backend_API.Controllers
@@ -34,7 +36,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
         }
 
         // POST: api/Auth/register
-        [HttpPost("register")]
+        [HttpPost("register"), EnableRateLimiting("identity")]
         public async Task<IActionResult> Register(
             [FromBody] RegisterDto dto)
         {
@@ -89,7 +91,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
         }
 
 
-        [HttpPost("login")]
+        [HttpPost("login"), EnableRateLimiting("identity")]
         public async Task<IActionResult> Login(
             [FromBody] LoginDto dto)
         {
@@ -185,23 +187,35 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 expires: expiresAt,
                 signingCredentials: credentials);
 
+            _context.UserSessions.Add(new UserSession {
+                UserId = user.UserId,
+                RefreshTokenHash = HashSession(claims.Single(c => c.Type == JwtRegisteredClaimNames.Jti).Value),
+                ExpiresAt = expiresAt
+            });
+            await _context.SaveChangesAsync();
+
             var tokenString = new JwtSecurityTokenHandler()
                 .WriteToken(token);
 
+            Response.Cookies.Append("ksk_session", tokenString, new CookieOptions {
+                HttpOnly = true, Secure = SecureCookie, SameSite = SameSiteMode.Strict,
+                Expires = expiresAt, Path = "/api"
+            });
             return Ok(new
             {
                 message = "Login successful.",
-                token = tokenString,
+
                 expiresAt = expiresAt,
                 userId = user.UserId,
                 fullName = user.FullName,
+                phoneNumber = user.PhoneNumber,
                 email = user.Email,
                 role = user.Role
             });
         }
 
         // POST: api/Auth/create-consultant
-        [HttpPost("create-consultant")]
+        [HttpPost("staff")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateConsultant(
             [FromBody] CreateConsultantDto dto)
@@ -224,7 +238,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                 FullName = dto.FullName.Trim(),
                 Email = email,
                 PhoneNumber = dto.PhoneNumber.Trim(),
-                Role = "Consultant",
+                Role = "Staff",
                 Active = true,
                 CreatedAt = DateTime.UtcNow
             };
@@ -249,12 +263,44 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
 
             return StatusCode(201, new
             {
-                message = "Consultant account created successfully.",
+                message = "Staff account created successfully.",
                 userId = consultant.UserId,
                 fullName = consultant.FullName,
                 email = consultant.Email,
                 role = consultant.Role
             });
+        }
+
+        private bool SecureCookie => Request.IsHttps || !(HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment()
+            || HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsEnvironment("Testing"));
+        public static string HashSession(string id) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id)));
+
+        [HttpGet("me"), Authorize]
+        public async Task<IActionResult> Me()
+        {
+            var id = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _context.UserAccounts.AsNoTracking().SingleAsync(u => u.UserId == id);
+            return Ok(new { userId = user.UserId, fullName = user.FullName, email = user.Email, phoneNumber = user.PhoneNumber, role = user.Role });
+        }
+
+        [HttpPut("me"), Authorize]
+        public async Task<IActionResult> Profile(ContactDetails dto)
+        {
+            var id = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _context.UserAccounts.SingleAsync(u => u.UserId == id);
+            user.FullName = dto.Name.Trim(); user.PhoneNumber = dto.Phone.Trim();
+            await _context.SaveChangesAsync();
+            return Ok(new { userId = user.UserId, fullName = user.FullName, email = user.Email, phoneNumber = user.PhoneNumber, role = user.Role });
+        }
+
+        [HttpPost("logout"), Authorize]
+        public async Task<IActionResult> Logout()
+        {
+            var hash = HashSession(User.FindFirstValue(JwtRegisteredClaimNames.Jti)!);
+            var session = await _context.UserSessions.SingleOrDefaultAsync(s => s.RefreshTokenHash == hash);
+            if (session != null) { session.RevokedAt = DateTime.UtcNow; await _context.SaveChangesAsync(); }
+            Response.Cookies.Delete("ksk_session", new CookieOptions { Path = "/api", Secure = SecureCookie, SameSite = SameSiteMode.Strict });
+            return NoContent();
         }
 
     }

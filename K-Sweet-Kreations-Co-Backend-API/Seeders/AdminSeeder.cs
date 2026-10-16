@@ -28,10 +28,11 @@ namespace K_Sweet_Kreations_Co_Backend_API.Seeders
             var password = configuration["SeedAdmin:Password"];
 
             if (string.IsNullOrWhiteSpace(email) ||
-                string.IsNullOrWhiteSpace(password))
+                string.IsNullOrWhiteSpace(password) || password.Length < 12 ||
+                !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email))
             {
                 throw new InvalidOperationException(
-                    "Development Admin credentials are not configured.");
+                    "Configure a valid Admin email and a password of at least 12 characters before enabling Admin seeding.");
             }
 
             var adminExists = await context.UserAccounts

@@ -1,4 +1,4 @@
-﻿
+
 using K_Sweet_Kreations_Co_Backend_API.Data;
 using K_Sweet_Kreations_Co_Backend_API.Dtos;
 using K_Sweet_Kreations_Co_Backend_API.Models;
@@ -14,6 +14,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [NonController]
     [Authorize]
     public class CustomerOrdersController : ControllerBase
     {

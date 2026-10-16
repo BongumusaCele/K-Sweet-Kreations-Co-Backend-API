@@ -1,10 +1,12 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace K_Sweet_Kreations_Co_Backend_API.Models
 {
     public class Payment
     {
+        [MaxLength(255)] public string? StoredProofName { get; set; }
+
         [Key]
         public int PaymentId { get; set; }
 

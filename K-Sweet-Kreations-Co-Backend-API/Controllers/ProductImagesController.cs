@@ -1,9 +1,10 @@
-﻿
+
 using K_Sweet_Kreations_Co_Backend_API.Data;
 using K_Sweet_Kreations_Co_Backend_API.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using K_Sweet_Kreations_Co_Backend_API.Services;
 
 namespace K_Sweet_Kreations_Co_Backend_API.Controllers
 {
@@ -12,18 +13,21 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
     public class ProductImagesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        private readonly IWebHostEnvironment _environment;
+        private readonly PrivateImageStore _images;
+
 
         public ProductImagesController(
             ApplicationDbContext context,
-            IWebHostEnvironment environment)
+            PrivateImageStore images)
         {
             _context = context;
-            _environment = environment;
+            _images = images;
+
         }
 
         // POST: api/ProductImages/upload
         [HttpPost("upload")]
+        [RequestSizeLimit(3 * 1024 * 1024)]
         [Authorize(Roles = "Admin")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadImage(
@@ -41,84 +45,14 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             var product = await _context.Products
                 .FindAsync(productId);
 
-            if (product == null)
+            if (product == null || product.DeletedAt != null)
                 return NotFound(new
                 {
                     message = "Product not found."
                 });
 
-            // Maximum image size: 5 MB
-            if (file.Length > 5 * 1024 * 1024)
-                return BadRequest(new
-                {
-                    message = "Image cannot exceed 5 MB."
-                });
-
-            var extension = Path.GetExtension(file.FileName)
-                .ToLowerInvariant();
-
-            var allowedExtensions = new[]
-            {
-                ".jpg", ".jpeg", ".png", ".webp"
-            };
-
-            if (!allowedExtensions.Contains(extension))
-                return BadRequest(new
-                {
-                    message = "Only JPG, PNG and WebP images are allowed."
-                });
-
-            // Validate image file signatures
-            var header = new byte[12];
-            await using (var input = file.OpenReadStream())
-            {
-                var bytesRead = await input.ReadAsync(header);
-
-                bool validJpeg = bytesRead >= 3 &&
-                    header[0] == 0xFF &&
-                    header[1] == 0xD8 &&
-                    header[2] == 0xFF;
-
-                bool validPng = bytesRead >= 8 &&
-                    header.Take(8).SequenceEqual(
-                        new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
-
-                bool validWebp = bytesRead >= 12 &&
-                    System.Text.Encoding.ASCII.GetString(header, 0, 4) == "RIFF" &&
-                    System.Text.Encoding.ASCII.GetString(header, 8, 4) == "WEBP";
-
-                bool validImage = extension switch
-                {
-                    ".jpg" or ".jpeg" => validJpeg,
-                    ".png" => validPng,
-                    ".webp" => validWebp,
-                    _ => false
-                };
-
-                if (!validImage)
-                    return BadRequest(new
-                    {
-                        message = "Invalid image file format."
-                    });
-            }
-
-            var uploadsFolder = Path.Combine(
-                _environment.ContentRootPath,
-                "wwwroot", "uploads", "products");
-
-            Directory.CreateDirectory(uploadsFolder);
-
-            var fileName = $"{Guid.NewGuid():N}{extension}";
-            var filePath = Path.Combine(uploadsFolder, fileName);
-
-            await using (var stream = new FileStream(
-                filePath, FileMode.CreateNew))
-            {
-                await file.CopyToAsync(stream);
-            }
-
+            var fileName = await _images.Save(file, "products");
             var imageUrl = $"/uploads/products/{fileName}";
-
             var productImage = new ProductImage
             {
                 ProductId = productId,
@@ -140,6 +74,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
                                         i.IsPrimary)
                             .ToListAsync();
 
+                    product.Image = imageUrl;
                     foreach (var image in previousPrimaryImages)
                         image.IsPrimary = false;
                 }
@@ -150,8 +85,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
             }
             catch
             {
-                if (System.IO.File.Exists(filePath))
-                    System.IO.File.Delete(filePath);
+                await _images.Delete("products", fileName);
 
                 throw;
             }
@@ -177,7 +111,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
         {
             var image = await _context.ProductImages
                 .AsNoTracking()
-                .Where(i => i.ProductImageId == id)
+                .Where(i => i.ProductImageId == id && i.Product.DeletedAt == null)
                 .Select(i => new
                 {
                     i.ProductImageId,
@@ -203,7 +137,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
         public async Task<IActionResult> GetProductImages(int productId)
         {
             var productExists = await _context.Products
-                .AnyAsync(p => p.ProductId == productId);
+                .AnyAsync(p => p.ProductId == productId && p.DeletedAt == null);
 
             if (!productExists)
                 return NotFound(new

@@ -1,4 +1,5 @@
-﻿
+
+using K_Sweet_Kreations_Co_Backend_API.Data;
 using K_Sweet_Kreations_Co_Backend_API.Dtos;
 using K_Sweet_Kreations_Co_Backend_API.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -8,6 +9,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [NonController]
     public class ProductsController : ControllerBase
     {
         private readonly ProductService _productService;

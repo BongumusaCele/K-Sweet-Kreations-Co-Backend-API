@@ -1,10 +1,14 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace K_Sweet_Kreations_Co_Backend_API.Models
 {
     public class Product
     {
+        [MaxLength(100)] public string Size { get; set; } = "";
+        [MaxLength(100)] public string Servings { get; set; } = "";
+        [MaxLength(500)] public string Image { get; set; } = "";
+
         [Key]
         public int ProductId { get; set; }
 
@@ -24,6 +28,7 @@ namespace K_Sweet_Kreations_Co_Backend_API.Models
         public decimal StartingPrice { get; set; }
 
         public bool Available { get; set; } = true;
+        public DateTime? DeletedAt { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

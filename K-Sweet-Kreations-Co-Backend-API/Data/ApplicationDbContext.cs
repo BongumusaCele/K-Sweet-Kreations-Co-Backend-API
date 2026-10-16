@@ -1,4 +1,4 @@
-﻿using K_Sweet_Kreations_Co_Backend_API.Models;
+using K_Sweet_Kreations_Co_Backend_API.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace K_Sweet_Kreations_Co_Backend_API.Data
@@ -25,9 +25,21 @@ namespace K_Sweet_Kreations_Co_Backend_API.Data
         public DbSet<CustomerNotification> CustomerNotifications { get; set; } = null!;
 
 
+        public DbSet<BlockedCollectionDate> BlockedCollectionDates { get; set; }
+        public DbSet<CustomerReview> CustomerReviews { get; set; }
+        public DbSet<WebsiteSubmission> WebsiteSubmissions { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<WebsiteSubmission>().HasKey(s => new { s.CustomerId, s.Kind, s.Id });
+            modelBuilder.Entity<CustomerOrder>().HasIndex(o => o.QuotationId)
+                .IsUnique().HasFilter("[QuotationId] IS NOT NULL");
+            modelBuilder.Entity<CustomerOrder>().HasIndex(o => o.RequestId)
+                .IsUnique().HasFilter("[RequestId] IS NOT NULL");
+            modelBuilder.Entity<BlockedCollectionDate>().HasIndex(d => d.Date).IsUnique();
+            modelBuilder.Entity<Payment>().HasIndex(p => p.PaymentReference)
+                .IsUnique().HasFilter("[PaymentReference] IS NOT NULL");
 
             modelBuilder.Entity<UserAccount>()
                 .HasIndex(u => u.Email)

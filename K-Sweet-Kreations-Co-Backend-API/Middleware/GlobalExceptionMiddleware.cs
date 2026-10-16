@@ -1,5 +1,7 @@
-﻿
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using K_Sweet_Kreations_Co_Backend_API.Services;
 
 namespace K_Sweet_Kreations_Co_Backend_API.Middleware
 {
@@ -35,14 +37,17 @@ namespace K_Sweet_Kreations_Co_Backend_API.Middleware
                 }
 
                 context.Response.Clear();
-                context.Response.StatusCode =
-                    StatusCodes.Status500InternalServerError;
+                var status = ex is WebsiteException website ? website.Status : ex is DbUpdateException ? 409 : 500;
+                var message = ex is WebsiteException ? ex.Message : status == 409
+                    ? "The record changed or already exists. Refresh and try again."
+                    : "An unexpected error occurred. Please try again later.";
+                context.Response.StatusCode = status;
 
                 var problem = new ProblemDetails
                 {
-                    Status = StatusCodes.Status500InternalServerError,
-                    Title = "Internal Server Error",
-                    Detail = "An unexpected error occurred. Please try again later.",
+                    Status = status,
+                    Title = status == 500 ? "Internal Server Error" : "Request could not be completed",
+                    Detail = message,
                     Instance = context.Request.Path
                 };
 
